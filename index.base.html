@@ -330,6 +330,16 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ===== 服务端书签（每日更新时嵌入） =====
+var serverBookmarks = <!--=BOOKMARKS_JSON=-->;
+
+// 合并服务端书签到 localStorage（服务端数据覆盖本地）
+try {
+  var local = JSON.parse(localStorage.getItem('gh_bookmarks') || '{}');
+  for (var k in serverBookmarks) { local[k] = serverBookmarks[k]; }
+  localStorage.setItem('gh_bookmarks', JSON.stringify(local));
+} catch(e) {}
+
 // ===== 文章详情切换 =====
 
 var savedScrollPos = 0;

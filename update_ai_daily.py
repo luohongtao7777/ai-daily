@@ -9,6 +9,7 @@ HTML_PATH = Path(__file__).parent / "index.html"
 OBSIDIAN_VAULT = Path("C:/obsidian/7777/学习笔记/AI日报")
 SERVER = "ubuntu@82.156.80.178"
 REMOTE_PATH = "/var/www/html/ai-daily/index.html"
+BOOKMARKS_PATH = Path(__file__).parent / "bookmarks.json"
 MAX_DAYS = 5
 ARTICLES_MARKER = "<!--=ARTICLES_MARKER=-->"
 GITHUB_PATH = Path(__file__).parent / "github_projects.json"
@@ -265,11 +266,15 @@ def inject_github(html, gh_data):
             'function toggleBookmark(idx){\n'
             "  var btn=document.getElementById('bm-'+idx); if(!btn) return;\n"
             '  var fn=btn.dataset.full, p=ghProjects[idx]; if(!p) return;\n'
-            "  if(bookmarked[fn]){delete bookmarked[fn];btn.textContent='\\u2606';btn.classList.remove('active');showToast('\\u5df2\\u53d6\\u6d88\\u6536\\u85cf');}\n"
+            "  if(bookmarked[fn]){\n"
+            "    delete bookmarked[fn];\n"
+            "    btn.textContent='\\u2606';btn.classList.remove('active');showToast('\\u5df2\\u53d6\\u6d88\\u6536\\u85cf');\n"
+            "    var x=new XMLHttpRequest();x.open('POST','/api/bookmark',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({action:'remove',full_name:fn}));\n"
+            '  }\n'
             '  else{\n'
             "    bookmarked[fn]={name:p.name,full_name:fn,url:p.url,stars:p.stars,language:p.language,summary:p.summary||p.description||'',bookmarked_at:new Date().toISOString()};\n"
             "    btn.textContent='\\u2605';btn.classList.add('active');showToast('\\u2705 \\u5df2\\u6536\\u85cf');\n"
-            "    var x=new XMLHttpRequest();x.open('POST','/api/bookmark',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify(bookmarked[fn]));\n"
+            "    var x=new XMLHttpRequest();x.open('POST','/api/bookmark',true);x.setRequestHeader('Content-Type','application/json');x.send(JSON.stringify({action:'add',full_name:fn,bookmark:bookmarked[fn]}));\n"
             '  }\n'
             "  localStorage.setItem('gh_bookmarks',JSON.stringify(bookmarked));updateBookmarkUI();\n"
             '}\n'
@@ -295,10 +300,26 @@ def inject_github(html, gh_data):
             html = html[:ls] + js + html[ls:]
     return html
 
+# ===== 书签嵌入 =====
+def embed_bookmarks(html):
+    """将服务端书签数据嵌入模板的 BOOKMARKS_JSON 标记位"""
+    bm_dict = {}
+    if BOOKMARKS_PATH.exists():
+        try:
+            bm = json.loads(BOOKMARKS_PATH.read_text("utf-8"))
+            if isinstance(bm, dict) and "items" in bm:
+                bm_dict = {b["full_name"]: b for b in bm["items"]}
+            elif isinstance(bm, list):
+                bm_dict = {b["full_name"]: b for b in bm}
+        except:
+            pass
+    return html.replace("<!--=BOOKMARKS_JSON=-->", json.dumps(bm_dict, ensure_ascii=False))
+
 # ===== 主流程 =====
 def update_html(news, gh_data=None):
     html = get_html()
     if html is None: print("❌ 找不到 index.html"); return False
+    html = embed_bookmarks(html)
     date, weekday, items = news["date"], news.get("weekday",""), news.get("items",[])
     nd = build_day(date, weekday, items)
     na = build_articles(date, items)
@@ -357,6 +378,47 @@ def save_obsidian(news):
     md.write_text("\n".join(lines), "utf-8")
     print(f"✅ Obsidian：{md}")
 
+
+def save_obsidian_bookmarks():
+    """将书签同步到 Obsidian 收藏笔记"""
+    OBSIDIAN_VAULT.mkdir(parents=True, exist_ok=True)
+    md_file = OBSIDIAN_VAULT / "⭐ 已收藏的 GitHub 项目.md"
+    lines = ["---", "title: ⭐ 已收藏的 GitHub 项目", f"updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+             "tags: [ai, github, bookmarks, 收藏]", "---", "",
+             "# ⭐ 已收藏的 GitHub 项目", "",
+             "> 自动同步 — 每日更新时刷新", ""]
+    if BOOKMARKS_PATH.exists():
+        try:
+            bm = json.loads(BOOKMARKS_PATH.read_text("utf-8"))
+            if isinstance(bm, dict) and "items" in bm:
+                items = bm["items"]
+            elif isinstance(bm, list):
+                items = bm
+            else:
+                items = []
+            if not items:
+                lines.append("暂无收藏的项目")
+            else:
+                for b in items:
+                    fn = b.get("full_name", "")
+                    name = b.get("name", fn.split("/")[-1] if "/" in fn else fn)
+                    stars = b.get("stars", 0)
+                    lang = b.get("language", "")
+                    url = b.get("url", f"https://github.com/{fn}")
+                    summary = b.get("summary", "")
+                    bt = b.get("bookmarked_at", "")[:10]
+                    lines += ["", f"### [{name}]({url})",
+                              f"- ⭐ {stars} Stars &nbsp;|&nbsp; 🔤 {lang} &nbsp;|&nbsp; 📅 {bt}",
+                              f"- {summary}" if summary else "",
+                              f"- `{fn}`", ""]
+        except:
+            lines.append("数据加载失败")
+    else:
+        lines.append("暂无收藏数据")
+    md_file.write_text("\n".join(lines), "utf-8")
+    print(f"✅ Obsidian 书签：{md_file}")
+
+
 def upload():
     try:
         r = subprocess.run(["scp",str(HTML_PATH),f"{SERVER}:{REMOTE_PATH}"], capture_output=True, text=True, timeout=30)
@@ -366,6 +428,9 @@ def upload():
     return False
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--sync-bookmarks":
+        save_obsidian_bookmarks()
+        sys.exit(0)
     news = load_news()
     if not news: print("❌ 未提供新闻数据"); sys.exit(1)
     gh = load_github()

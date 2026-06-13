@@ -1,0 +1,14 @@
+[Unit]
+Description=AI Daily Bookmark API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/bookmark-api
+ExecStart=/usr/bin/python3 /home/ubuntu/bookmark-api/bookmark_server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

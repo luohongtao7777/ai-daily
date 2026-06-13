@@ -62,11 +62,29 @@ def fetch_readme(full_name):
     return ""
 
 
+def load_old_translations():
+    """加载旧 JSON 中已有的 _readme_cn 和 _summary_cn，以便保留"""
+    old_items = {}
+    if DATA_FILE.exists():
+        try:
+            old = json.loads(DATA_FILE.read_text("utf-8"))
+            for p in old.get("items", []):
+                fn = p["full_name"]
+                carry = {}
+                if p.get("_readme_cn"): carry["_readme_cn"] = p["_readme_cn"]
+                if p.get("_summary_cn"): carry["_summary_cn"] = p["_summary_cn"]
+                if carry:
+                    old_items[fn] = carry
+        except:
+            pass
+    return old_items
+
 def main():
     print("=" * 50)
     print("  GitHub 涨星最快 AI 智能体项目")
     print("=" * 50)
 
+    old_translations = load_old_translations()
     all_items = []
     cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
 
@@ -120,6 +138,12 @@ def main():
         return str(n)
     for p in items:
         p["_stars_fmt"] = fmt(p["stars"])
+
+    # 保留旧 translations
+    for p in items:
+        old = old_translations.get(p["full_name"], {})
+        if old.get("_readme_cn"): p["_readme_cn"] = old["_readme_cn"]
+        if old.get("_summary_cn"): p["_summary_cn"] = old["_summary_cn"]
 
     # 保存（保留 _growth, _stars_fmt, _readme_raw 供后续翻译使用）
     DATA_FILE.write_text(json.dumps({
