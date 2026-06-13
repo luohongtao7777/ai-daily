@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+readmes/
+temp_*.json
+.synced_bookmarks.json
+index.html

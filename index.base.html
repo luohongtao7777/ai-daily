@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🤖 AI 日报</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card-bg: #ffffff;
+    --accent: #2563eb;
+    --accent2: #7c3aed;
+    --text: #1e293b;
+    --text-secondary: #475569;
+    --muted: #94a3b8;
+    --border: #e2e8f0;
+    --tag-bg: #dbeafe;
+    --tag-text: #1d4ed8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --gradient: linear-gradient(135deg, var(--accent), var(--accent2));
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
+  }
+  #app { max-width: 700px; margin: 0 auto; background: var(--bg); min-height: 100vh; }
+
+  /* ===== Header ===== */
+  header {
+    background: var(--gradient);
+    color: #fff;
+    padding: 32px 20px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  header h1 { font-size: 24px; font-weight: 700; }
+  header p { font-size: 13px; opacity: 0.85; margin-top: 6px; }
+
+  /* ===== Day Navigation ===== */
+  .day-nav {
+    display: flex;
+    gap: 6px;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .day-nav::-webkit-scrollbar { display: none; }
+  .day-nav a {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--bg);
+    border-radius: 16px;
+    text-decoration: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .day-nav a.active {
+    color: #fff;
+    background: var(--gradient);
+  }
+
+  /* ===== Day Sections ===== */
+  .day-section { margin-bottom: 10px; }
+  .day-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 14px 16px 8px;
+  }
+  .day-header .date { font-size: 15px; font-weight: 600; color: var(--text); }
+  .day-header .weekday { font-size: 12px; color: var(--muted); }
+  .day-header .update-badge {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* ===== News Cards ===== */
+  .news-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    margin: 0 16px 10px;
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border: 1px solid var(--border);
+  }
+  .news-card:active { transform: scale(0.98); }
+  .source-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .source-badge {
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 11px;
+  }
+  .category-tag {
+    background: #f3e8ff;
+    color: #7c3aed;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .source-url {
+    color: var(--muted);
+    margin-left: auto;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 6px;
+  }
+  .card-preview {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ===== Detail View ===== */
+  #detail-view { display: none; }
+  #detail-view.active { display: block; }
+  .detail-back {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .detail-back:active { opacity: 0.6; }
+  .article-item {
+    display: none;
+    padding: 14px 16px 40px;
+  }
+  .article-item.active { display: block; }
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .article-date {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .article-title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 12px;
+  }
+  .news-img {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 14px;
+    max-height: 300px;
+    object-fit: cover;
+  }
+  .content p {
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .terms-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+  }
+  .glossary-term {
+    position: relative;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: help;
+    border: 1px solid #fde68a;
+  }
+  .term-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: normal;
+    width: max-content;
+    max-width: min(280px, 80vw);
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    pointer-events: none;
+  }
+  .glossary-term:hover .term-tip,
+  .glossary-term:active .term-tip { display: block; }
+  .impact {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 14px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .source-ref {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 16px;
+  }
+
+  /* ===== Footer ===== */
+  .footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+    background: #fff;
+  }
+
+  /* ===== Toast ===== */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <h1>🤖 AI 日报</h1>
+    <p>每日 AI 资讯 · 多源聚合</p>
+  </header>
+
+  <nav class="day-nav">
+    <!-- DAY_NAV_PLACEHOLDER -->
+  </nav>
+
+  <div id="tab-news" class="tab-pane active">
+    <!-- DAYS_PLACEHOLDER -->
+  </div>
+  <!-- end tab-news -->
+
+  <div id="list-view">
+    <div class="day-group">
+    </div>
+  </div>
+
+  <div id="detail-view">
+    <div class="detail-back" onclick="window.backToList()">← 返回列表</div>
+    <!--=ARTICLES_MARKER=-->
+    <!-- gh-detail items go here -->
+  </div>
+
+  <div class="footer">
+    <p>🔄 每日 08:00 自动更新 · 保留最近 5 天记录</p>
+    <p style="margin-top:4px;">数据来源：Tavily · 多源聚合整理</p>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== 文章详情切换 =====
+
+var savedScrollPos = 0;
+
+function showArticle(articleId) {
+  document.querySelectorAll('.article-item').forEach(function(a) { a.classList.remove('active'); });
+  var target = document.getElementById(articleId);
+  if (target) target.classList.add('active');
+  savedScrollPos = window.scrollY;
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.style.display = 'none'; });
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'block';
+  document.getElementById('detail-view').scrollIntoView({block: 'start'});
+  history.pushState({view: 'detail', articleId: articleId}, '');
+}
+
+window.backToList = function() {
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('list-view').style.display = '';
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.style.display = ''; });
+  document.querySelectorAll('.article-item').forEach(function(a) { a.classList.remove('active'); });
+  requestAnimationFrame(function() {
+    window.scrollTo(0, savedScrollPos);
+  });
+}
+
+window.addEventListener('popstate', function(e) {
+  window.backToList();
+});
+
+// ===== 导航高亮 =====
+const observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
+    if (entry.isIntersecting) {
+      document.querySelectorAll('.day-nav a').forEach(function(a) { a.classList.remove('active'); });
+      var link = document.querySelector('.day-nav a[href="#' + entry.target.id + '"]');
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+document.querySelectorAll('.day-section').forEach(function(s) { observer.observe(s); });
+</script>
+
+</body>
+</html>
