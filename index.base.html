@@ -370,7 +370,16 @@ window.addEventListener('popstate', function(e) {
   window.backToList();
 });
 
-// ===== 导航高亮（已移除自动滚动监听，仅通过点击切换） =====
+// ===== 日期导航点击滚动（比浏览器锚点更可靠） =====
+function scrollToDay(date) {
+  var el = document.getElementById('day-' + date);
+  if (el) {
+    el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    document.querySelectorAll('.day-nav a').forEach(function(a) { a.classList.remove('active'); });
+    var link = document.querySelector('.day-nav a[data-date="' + date + '"]');
+    if (link) link.classList.add('active');
+  }
+}
 </script>
 
 </body>

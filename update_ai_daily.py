@@ -95,7 +95,7 @@ def build_nav(days):
     links = []
     for i, (d, w) in enumerate(days):
         cls = ' class="active"' if i == 0 else ""
-        links.append(f'  <a href="#day-{d}"{cls}>{d[5:]} {w}</a>')
+        links.append(f'  <a href="javascript:void(0)" onclick="scrollToDay(\'{d}\')" data-date="{d}"{cls}>{d[5:]} {w}</a>')
     return "\n".join(links)
 
 def extract_days(html):
