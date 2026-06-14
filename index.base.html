@@ -370,17 +370,7 @@ window.addEventListener('popstate', function(e) {
   window.backToList();
 });
 
-// ===== 导航高亮 =====
-const observer = new IntersectionObserver(function(entries) {
-  entries.forEach(function(entry) {
-    if (entry.isIntersecting) {
-      document.querySelectorAll('.day-nav a').forEach(function(a) { a.classList.remove('active'); });
-      var link = document.querySelector('.day-nav a[href="#' + entry.target.id + '"]');
-      if (link) link.classList.add('active');
-    }
-  });
-}, { rootMargin: '-80px 0px -60% 0px' });
-document.querySelectorAll('.day-section').forEach(function(s) { observer.observe(s); });
+// ===== 导航高亮（已移除自动滚动监听，仅通过点击切换） =====
 </script>
 
 </body>

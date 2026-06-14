@@ -91,7 +91,12 @@ def build_articles(date, items):
     return "\n".join(L)
 
 def build_nav(days):
-    return "\n".join(f'  <a href="#day-{d}">{d[5:]} {w}</a>' for d,w in days)
+    """生成导航链接，第一个（最新日期）默认 active"""
+    links = []
+    for i, (d, w) in enumerate(days):
+        cls = ' class="active"' if i == 0 else ""
+        links.append(f'  <a href="#day-{d}"{cls}>{d[5:]} {w}</a>')
+    return "\n".join(links)
 
 def extract_days(html):
     return re.findall(r'id="day-(\d{4}-\d{2}-\d{2})"', html)
