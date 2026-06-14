@@ -245,6 +245,19 @@
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     pointer-events: none;
   }
+  @media (max-width: 768px) {
+    .term-tip {
+      position: fixed;
+      bottom: auto;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: auto;
+      min-width: 160px;
+      max-width: 85vw;
+      z-index: 9999;
+    }
+  }
   .glossary-term:hover .term-tip,
   .glossary-term:active .term-tip { display: block; }
   .impact {
