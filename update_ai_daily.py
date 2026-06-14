@@ -335,6 +335,77 @@ def embed_bookmarks(html):
     return html.replace("<!--=BOOKMARKS_JSON=-->", json.dumps(bm_dict, ensure_ascii=False))
 
 # ===== 主流程 =====
+def rebuild_ghdata(html, gh_data, current_date):
+    """替换/注入 ghData JS 块（只保留有 gh_<date>.json 文件的数据）"""
+    base_dir = GITHUB_PATH.parent
+    all_gh = {}
+    m = re.search(r'var ghData\s*=\s*({.*?});', html, re.DOTALL)
+    if m:
+        try:
+            existing = json.loads(m.group(1))
+            for d, items in existing.items():
+                if items and (base_dir / f"gh_{d}.json").exists():
+                    all_gh[d] = items
+        except:
+            pass
+    if gh_data and gh_data.get("items"):
+        items_clean = [{
+            "full_name": p.get("full_name",""),
+            "name": p.get("name",""),
+            "stars": p.get("stars",0),
+            "forks": p.get("forks",0),
+            "language": p.get("language",""),
+            "description": p.get("description",""),
+            "_summary_cn": p.get("_summary_cn",""),
+        } for p in gh_data["items"]]
+        all_gh[current_date] = items_clean
+    gh_js = '<script>\n// GH_DATA_START\nvar ghData = ' + json.dumps({
+        d: [{
+            "full_name": p.get("full_name",""),
+            "name": p.get("name",""),
+            "stars": p.get("stars",0),
+            "forks": p.get("forks",0),
+            "language": p.get("language",""),
+            "description": p.get("description",""),
+            "_summary_cn": p.get("_summary_cn",""),
+        } for p in (g if g else [])]
+        for d, g in sorted(all_gh.items(), reverse=True)
+    }, ensure_ascii=False) + ';\n'
+    gh_js += 'function switchGhData(date) {\n'
+    gh_js += '  var items = ghData[date];\n'
+    gh_js += '  var cardsDiv = document.getElementById("github-cards");\n'
+    gh_js += '  if (!cardsDiv) return;\n'
+    gh_js += '  if (!items || !items.length) {\n'
+    gh_js += '    cardsDiv.innerHTML = \'<div style="text-align:center;padding:30px;color:var(--muted);font-size:14px;">📭 当日暂无 GitHub 热门项目数据</div>\';\n'
+    gh_js += '    return;\n'
+    gh_js += '  }\n'
+    gh_js += '  var h = "";\n'
+    gh_js += '  for (var i=0; i<items.length; i++) {\n'
+    gh_js += '    var p = items[i];\n'
+    gh_js += '    var desc = (p._summary_cn || p.summary || p.description || "").slice(0,120);\n'
+    gh_js += '    h += "<div class=\\\"gh-card\\\" onclick=\\\"showGhProject("+i+")\\\"><div class=\\\"gh-card-top\\\"><div class=\\\"gh-card-title\\\">"+p.name+"<span class=\\\"gh-owner\\\">"+p.full_name+"</span></div><button class=\\\"bookmark-btn\\\" onclick=\\\"event.stopPropagation(); toggleBookmark("+i+")\\\" id=\\"bm-"+i+"\\" data-full=\'"+p.full_name+"\'>☆</button></div><div class=\\\"gh-card-meta\\\"><span class=\\\"gh-stars\\\">"+p.stars+"</span> <span class=\\\"gh-lang\\\">"+(p.language||"")+"</span> <span class=\\\"gh-forks\\\">"+p.forks+"</span></div><div class=\\\"gh-card-desc\\\">"+desc+"</div></div>";\n'
+    gh_js += '  }\n'
+    gh_js += '  cardsDiv.innerHTML = h;\n'
+    gh_js += '  updateBookmarkUI();\n'
+    gh_js += '}\n'
+    gh_js += 'var keys = Object.keys(ghData); ghProjects = keys.length ? ghData[keys[0]] : [];\n'
+    gh_js += '// GH_DATA_END\n</script>'
+    # 替换旧的 ghData 块
+    gs = html.find('// GH_DATA_START')
+    ge = html.find('// GH_DATA_END')
+    if gs >= 0 and ge > gs:
+        s1 = html.rfind('<script', 0, gs)
+        s2 = html.find('</script>', ge)
+        if s1 >= 0: gs = s1
+        if s2 >= 0: ge = s2 + len('</script>')
+        html = html[:gs] + gh_js + html[ge:]
+    else:
+        be = html.find('</body>')
+        if be >= 0:
+            html = html[:be] + gh_js + '\n' + html[be:]
+    return html
+
+# ===== 主流程 =====
 def update_html(news, gh_data=None):
     html = get_html()
     if html is None: print("❌ 找不到 index.html"); return False
@@ -345,7 +416,8 @@ def update_html(news, gh_data=None):
     if f'id="day-{date}"' in html:
         print(f"⚠️ {date} 已存在，跳过插入")
         if gh_data and gh_data.get("items"):
-            updated = inject_github(html, gh_data)
+            updated = rebuild_ghdata(html, gh_data, date)
+            updated = inject_github(updated, gh_data)
             HTML_PATH.write_text(updated, "utf-8")
             print("✅ GitHub 数据已更新")
         return False
@@ -386,55 +458,7 @@ def update_html(news, gh_data=None):
         updated, _ = prune_old(updated)
     if gh_data and gh_data.get("items"):
         updated = inject_github(updated, gh_data)
-    # 累积多日 GitHub 数据到 JS（跨进程：从已有 HTML 中读取再合并）
-    all_gh = {}
-    m = re.search(r'var ghData\s*=\s*({.*?});', updated, re.DOTALL)
-    if m:
-        try: all_gh = json.loads(m.group(1))
-        except: pass
-    all_gh[news["date"]] = (gh_data.get("items", []) if gh_data else [])
-    gh_js = '<script>\n// GH_DATA_START\nvar ghData = ' + json.dumps({
-        d: [{
-            "full_name": p.get("full_name",""),
-            "name": p.get("name",""),
-            "stars": p.get("stars",0),
-            "forks": p.get("forks",0),
-            "language": p.get("language",""),
-            "description": p.get("description",""),
-            "_summary_cn": p.get("_summary_cn",""),
-        } for p in (g if g else [])]
-        for d, g in sorted(all_gh.items(), reverse=True)
-    }, ensure_ascii=False) + ';\n'
-    gh_js += 'function switchGhData(date) {\n'
-    gh_js += '  var items = ghData[date];\n'
-    gh_js += '  if (!items || !items.length) return;\n'
-    gh_js += '  var cardsDiv = document.getElementById("github-cards");\n'
-    gh_js += '  if (!cardsDiv) return;\n'
-    gh_js += '  var h = "";\n'
-    gh_js += '  for (var i=0; i<items.length; i++) {\n'
-    gh_js += '    var p = items[i];\n'
-    gh_js += '    var desc = (p._summary_cn || p.summary || p.description || "").slice(0,120);\n'
-    gh_js += '    h += "<div class=\\"gh-card\\" onclick=\\"showGhProject("+i+")\\"><div class=\\"gh-card-top\\"><div class=\\"gh-card-title\\">"+p.name+"<span class=\\"gh-owner\\">"+p.full_name+"</span></div><button class=\\"bookmark-btn\\" onclick=\\"event.stopPropagation(); toggleBookmark("+i+")\\" id=\\"bm-"+i+"\\" data-full=\'"+p.full_name+"\'>☆</button></div><div class=\\"gh-card-meta\\"><span class=\\"gh-stars\\">"+p.stars+"</span> <span class=\\"gh-lang\\">"+(p.language||"")+"</span> <span class=\\"gh-forks\\">"+p.forks+"</span></div><div class=\\"gh-card-desc\\">"+desc+"</div></div>";\n'
-    gh_js += '  }\n'
-    gh_js += '  cardsDiv.innerHTML = h;\n'
-    gh_js += '  updateBookmarkUI();\n'
-    gh_js += '}\n'
-    gh_js += 'ghProjects = ghData[Object.keys(ghData)[0]] || [];\n'
-    gh_js += '// GH_DATA_END\n</script>'
-    # 移除旧的 ghData 块（包括前后的 <script> 标签）
-    gs = updated.find('// GH_DATA_START')
-    ge = updated.find('// GH_DATA_END')
-    if gs >= 0 and ge > gs:
-        # 扩至前一个 <script 和后一个 </script>
-        s1 = updated.rfind('<script', 0, gs)
-        s2 = updated.find('</script>', ge)
-        if s1 >= 0: gs = s1
-        if s2 >= 0: ge = s2 + len('</script>')
-        updated = updated[:gs] + gh_js + updated[ge:]
-    else:
-        be = updated.find('</body>')
-        if be >= 0:
-            updated = updated[:be] + gh_js + '\n' + updated[be:]
+    updated = rebuild_ghdata(updated, gh_data, news["date"])
     HTML_PATH.write_text(updated, "utf-8")
     print("✅ index.html 已更新")
     return True
