@@ -233,7 +233,8 @@ def inject_github(html, gh_data):
         end_marker = '<!-- end tab-news -->'
         tn_end = html.find(end_marker)
         if tn_end >= 0:
-            html = html.replace(end_marker, gh_tab + '\n  ' + end_marker)
+            # tab-github 插入到 marker 之后，不破坏 marker 与 </div> 的紧邻关系
+            html = html.replace(end_marker, end_marker + '\n' + gh_tab + '\n')
 
         # 3. gh-detail 放入共享 detail-view（在 detail-back 元素后面）
         # 找实际的 <div class="detail-back" 元素（不是 CSS 中的 .detail-back）
