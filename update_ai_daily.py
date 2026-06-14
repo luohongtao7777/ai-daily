@@ -338,20 +338,13 @@ def embed_bookmarks(html):
 
 # ===== 主流程 =====
 def rebuild_ghdata(html, gh_data, current_date):
-    """替换/注入 ghData JS 块（只保留有 gh_<date>.json 文件的数据）"""
-    base_dir = GITHUB_PATH.parent
-    all_gh = {}
-    m = re.search(r'var ghData\s*=\s*({.*?});', html, re.DOTALL)
-    if m:
-        try:
-            existing = json.loads(m.group(1))
-            for d, items in existing.items():
-                if items and (base_dir / f"gh_{d}.json").exists():
-                    all_gh[d] = items
-        except:
-            pass
+    """替换/注入 ghData JS 块（所有日期共用最新的涨星数据）"""
+    all_dates = set(re.findall(r'id="day-(\d{4}-\d{2}-\d{2})"', html))
+    if not all_dates:
+        all_dates = {current_date}
+    # 整理最新数据（所有日期共享同一份）
     if gh_data and gh_data.get("items"):
-        items_clean = [{
+        clean_items = [{
             "full_name": p.get("full_name",""),
             "name": p.get("name",""),
             "stars": p.get("stars",0),
@@ -361,28 +354,15 @@ def rebuild_ghdata(html, gh_data, current_date):
             "description": p.get("description",""),
             "_summary_cn": p.get("_summary_cn",""),
         } for p in gh_data["items"]]
-        all_gh[current_date] = items_clean
-    gh_js = '<script>\n// GH_DATA_START\nvar ghData = ' + json.dumps({
-        d: [{
-            "full_name": p.get("full_name",""),
-            "name": p.get("name",""),
-            "stars": p.get("stars",0),
-            "forks": p.get("forks",0),
-            "_growth": p.get("_growth",0),
-            "language": p.get("language",""),
-            "description": p.get("description",""),
-            "_summary_cn": p.get("_summary_cn",""),
-        } for p in (g if g else [])]
-        for d, g in sorted(all_gh.items(), reverse=True)
-    }, ensure_ascii=False) + ';\n'
+    else:
+        clean_items = []
+    # 所有日期指向同一份最新数据
+    gh_map = {d: clean_items for d in sorted(all_dates, reverse=True)}
+    gh_js = '<script>\n// GH_DATA_START\nvar ghData = ' + json.dumps(gh_map, ensure_ascii=False) + ';\n'
     gh_js += 'function switchGhData(date) {\n'
     gh_js += '  var items = ghData[date];\n'
     gh_js += '  var cardsDiv = document.getElementById("github-cards");\n'
     gh_js += '  if (!cardsDiv) return;\n'
-    gh_js += '  if (!items || !items.length) {\n'
-    gh_js += '    cardsDiv.innerHTML = \'<div style="text-align:center;padding:30px;color:var(--muted);font-size:14px;">📭 当日暂无涨星数据</div>\';\n'
-    gh_js += '    return;\n'
-    gh_js += '  }\n'
     gh_js += '  var h = "";\n'
     gh_js += '  for (var i=0; i<items.length; i++) {\n'
     gh_js += '    var p = items[i];\n'
