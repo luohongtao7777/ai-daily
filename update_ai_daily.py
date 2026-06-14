@@ -337,14 +337,21 @@ def embed_bookmarks(html):
     return html.replace("<!--=BOOKMARKS_JSON=-->", json.dumps(bm_dict, ensure_ascii=False))
 
 # ===== 主流程 =====
+def load_gh_snapshot(date):
+    """加载指定日期的 GitHub 快照，不存在则返回 None"""
+    f = GITHUB_PATH.parent / f"gh_{date}.json"
+    if f.exists():
+        return json.loads(f.read_text("utf-8"))
+    return None
+
 def rebuild_ghdata(html, gh_data, current_date):
-    """替换/注入 ghData JS 块（所有日期共用最新的涨星数据）"""
+    """替换/注入 ghData JS 块（各日期优先用自己快照，没有的用最新兜底）"""
     all_dates = set(re.findall(r'id="day-(\d{4}-\d{2}-\d{2})"', html))
     if not all_dates:
         all_dates = {current_date}
-    # 整理最新数据（所有日期共享同一份）
-    if gh_data and gh_data.get("items"):
-        clean_items = [{
+
+    def _clean(items):
+        return [{
             "full_name": p.get("full_name",""),
             "name": p.get("name",""),
             "stars": p.get("stars",0),
@@ -353,11 +360,17 @@ def rebuild_ghdata(html, gh_data, current_date):
             "language": p.get("language",""),
             "description": p.get("description",""),
             "_summary_cn": p.get("_summary_cn",""),
-        } for p in gh_data["items"]]
-    else:
-        clean_items = []
-    # 所有日期指向同一份最新数据
-    gh_map = {d: clean_items for d in sorted(all_dates, reverse=True)}
+        } for p in (items or [])]
+
+    gh_map = {}
+    for d in sorted(all_dates, reverse=True):
+        snap = load_gh_snapshot(d)
+        if snap and snap.get("items"):
+            gh_map[d] = _clean(snap["items"])
+        elif gh_data and gh_data.get("items"):
+            gh_map[d] = _clean(gh_data["items"])
+        else:
+            gh_map[d] = []
     gh_js = '<script>\n// GH_DATA_START\nvar ghData = ' + json.dumps(gh_map, ensure_ascii=False) + ';\n'
     gh_js += 'function switchGhData(date) {\n'
     gh_js += '  var items = ghData[date];\n'
