@@ -12,6 +12,16 @@ print("=" * 45)
 print("  🤖 AI 日报 · 每日更新")
 print("=" * 45)
 
+# Step 0: 获取今日新闻
+print("\n--- 📰 获取今日新闻 ---")
+fetch_result = subprocess.run(
+    ["python", str(BASE / "fetch_news.py")],
+    capture_output=True, text=True
+)
+print(fetch_result.stdout.strip())
+if fetch_result.stderr.strip():
+    print(f"  ⚠️ {fetch_result.stderr.strip()}", file=sys.stderr)
+
 # Step 1: Fetch GitHub projects
 print("\n--- 🔥 GitHub 项目 ---")
 subprocess.run(["python", str(BASE / "fetch_github_projects.py")])

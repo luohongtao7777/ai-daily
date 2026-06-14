@@ -336,18 +336,30 @@ def update_html(news, gh_data=None):
         updated = updated.replace("<!-- DAY_NAV_PLACEHOLDER -->", build_nav([(date, weekday)]))
         updated = updated.replace(ARTICLES_MARKER, na + f"\n  {ARTICLES_MARKER}")
     else:
-        # 后续运行：新 day-section 插入 tab-news 内部（闭合之前）
+        # 后续运行：新 day-section 插入到末尾
         tn_close = html.find('</div>\n  <!-- end tab-news -->')
         if tn_close >= 0:
             updated = html[:tn_close] + f"\n{nd}\n" + html[tn_close:]
         else:
-            # fallback: 插入到 footer 前
             pos = html.find('<div class="footer">')
             if pos < 0: print("❌ 找不到 footer 标记"); return False
             updated = html[:pos] + f"\n{nd}\n" + html[pos:]
         am = updated.find(ARTICLES_MARKER)
         if am >= 0: updated = updated[:am] + f"\n{na}\n" + updated[am:]
+        # 将所有 day-section 按日期降序重排（最新在前）
         days = sorted(set(extract_days(updated)), reverse=True)
+        if len(days) > 1:
+            rebuilt = ''
+            tab_start = updated.find('<div id="tab-news"')
+            tag_end = updated.find('>', tab_start) + 1
+            tab_end = updated.find('</div>\n  <!-- end tab-news -->')
+            for d in days:
+                m = re.search(rf'<section class="day-section" id="day-{re.escape(d)}">.*?</section>', updated, flags=re.DOTALL)
+                if m:
+                    rebuilt += '\n' + m.group()
+            if tab_start >= 0 and tab_end > tag_end:
+                updated = updated[:tag_end] + rebuilt + '\n' + updated[tab_end:]
+        # 更新导航
         wd = [(d, WEEKDAY_NAMES[datetime.strptime(d,"%Y-%m-%d").weekday()]) for d in days]
         updated = re.sub(r'<nav class="day-nav">.*?</nav>', f'<nav class="day-nav">\n{build_nav(wd)}\n</nav>', updated, flags=re.DOTALL)
     updated, _ = prune_old(updated)
