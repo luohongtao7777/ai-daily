@@ -143,7 +143,7 @@ def gh_cards(items):
       <button class="bookmark-btn" onclick="event.stopPropagation(); toggleBookmark({i})" id="bm-{i}" data-full='{p["full_name"]}'>☆</button>
     </div>
     <div class="gh-card-meta">
-      <span class="gh-stars">{p["stars"]}</span> {lang} <span class="gh-forks">{p["forks"]}</span>
+      <span class="gh-growth">+{p.get("_growth",0):.0f}/天</span> {lang} <span class="gh-stars">{p["stars"]}</span>
     </div>
     <div class="gh-card-desc">{desc}</div>
   </div>''')
@@ -163,6 +163,7 @@ def gh_details(items):
     </div>
     <h2 class="article-title">{p["name"]}</h2>
     <div class="gh-detail-stats">
+      <span>📈 <strong>+{p.get("_growth",0):.0f}</strong>/天</span>
       <span>⭐ <strong>{p["stars"]}</strong> stars</span>
       <span>⑂ <strong>{p["forks"]}</strong> forks</span>
       <span>📋 <strong>{p.get("open_issues",0)}</strong> issues</span>
@@ -190,6 +191,7 @@ GH_CSS = """
   .gh-card-title .gh-owner { font-size:12px; font-weight:400; color:var(--muted); display:block; margin-top:1px; }
   .gh-stars { display:flex; align-items:center; gap:2px; font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; }
   .gh-stars::before { content:"⭐"; font-size:12px; }
+  .gh-growth { font-size:12px; font-weight:600; color:#059669; white-space:nowrap; }
   .gh-card-desc { font-size:13px; color:var(--text-secondary); line-height:1.6; margin-top:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .gh-card-meta { display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap; }
   .gh-lang { font-size:11px; padding:2px 8px; border-radius:4px; background:#e8f5e9; color:#2e7d32; }
@@ -225,7 +227,7 @@ def inject_github(html, gh_data):
         if tn >= 0:
             start = html.rfind('<div', 0, tn)
             if start >= 0:
-                tb = '<div class="tab-bar" onclick="return handleTabClick(event)" ontouchstart="return handleTabClick(event)">\n  <span class="tab active" data-tab="news">📰 AI资讯</span>\n  <span class="tab" data-tab="github">🔥 热门项目</span>\n</div>\n'
+                tb = '<div class="tab-bar" onclick="return handleTabClick(event)" ontouchstart="return handleTabClick(event)">\n  <span class="tab active" data-tab="news">📰 AI资讯</span>\n  <span class="tab" data-tab="github">🔥 涨星最快</span>\n</div>\n'
                 html = html[:start] + tb + html[start:]
 
         # 2. tab-github 放在 tab-news 闭合之后（仅含卡片列表，不含详情）
@@ -233,7 +235,7 @@ def inject_github(html, gh_data):
         gh_tab = (
             '<div id="tab-github" class="tab-pane">\n'
             '  <div class="github-header">\n'
-            f'    <span>🔥 AI 智能体热门项目</span>\n'
+            f'    <span>🔥 AI 智能体涨星最快</span>\n'
             f'    <span class="update-time">更新于 {ut}</span>\n'
             '  </div>\n'
             f'  <div class="github-section" id="github-cards">\n{gh_cards(items)}\n  </div>\n'
@@ -354,6 +356,7 @@ def rebuild_ghdata(html, gh_data, current_date):
             "name": p.get("name",""),
             "stars": p.get("stars",0),
             "forks": p.get("forks",0),
+            "_growth": p.get("_growth",0),
             "language": p.get("language",""),
             "description": p.get("description",""),
             "_summary_cn": p.get("_summary_cn",""),
@@ -365,6 +368,7 @@ def rebuild_ghdata(html, gh_data, current_date):
             "name": p.get("name",""),
             "stars": p.get("stars",0),
             "forks": p.get("forks",0),
+            "_growth": p.get("_growth",0),
             "language": p.get("language",""),
             "description": p.get("description",""),
             "_summary_cn": p.get("_summary_cn",""),
@@ -376,14 +380,15 @@ def rebuild_ghdata(html, gh_data, current_date):
     gh_js += '  var cardsDiv = document.getElementById("github-cards");\n'
     gh_js += '  if (!cardsDiv) return;\n'
     gh_js += '  if (!items || !items.length) {\n'
-    gh_js += '    cardsDiv.innerHTML = \'<div style="text-align:center;padding:30px;color:var(--muted);font-size:14px;">📭 当日暂无 GitHub 热门项目数据</div>\';\n'
+    gh_js += '    cardsDiv.innerHTML = \'<div style="text-align:center;padding:30px;color:var(--muted);font-size:14px;">📭 当日暂无涨星数据</div>\';\n'
     gh_js += '    return;\n'
     gh_js += '  }\n'
     gh_js += '  var h = "";\n'
     gh_js += '  for (var i=0; i<items.length; i++) {\n'
     gh_js += '    var p = items[i];\n'
+    gh_js += '    var growth = p._growth ? Math.round(p._growth) : 0;\n'
     gh_js += '    var desc = (p._summary_cn || p.summary || p.description || "").slice(0,120);\n'
-    gh_js += '    h += "<div class=\\\"gh-card\\\" onclick=\\\"showGhProject("+i+")\\\"><div class=\\\"gh-card-top\\\"><div class=\\\"gh-card-title\\\">"+p.name+"<span class=\\\"gh-owner\\\">"+p.full_name+"</span></div><button class=\\\"bookmark-btn\\\" onclick=\\\"event.stopPropagation(); toggleBookmark("+i+")\\\" id=\\"bm-"+i+"\\" data-full=\'"+p.full_name+"\'>☆</button></div><div class=\\\"gh-card-meta\\\"><span class=\\\"gh-stars\\\">"+p.stars+"</span> <span class=\\\"gh-lang\\\">"+(p.language||"")+"</span> <span class=\\\"gh-forks\\\">"+p.forks+"</span></div><div class=\\\"gh-card-desc\\\">"+desc+"</div></div>";\n'
+    gh_js += '    h += "<div class=\\"gh-card\\" onclick=\\"showGhProject("+i+")\\"><div class=\\"gh-card-top\\"><div class=\\"gh-card-title\\">"+p.name+"<span class=\\"gh-owner\\">"+p.full_name+"</span></div><button class=\\"bookmark-btn\\" onclick=\\"event.stopPropagation(); toggleBookmark("+i+")\\" id=\\"bm-"+i+"\\" data-full=\'"+p.full_name+"\'>☆</button></div><div class=\\"gh-card-meta\\"><span class=\\"gh-growth\\">+"+growth+"/天</span> <span class=\\"gh-lang\\">"+(p.language||"")+"</span> <span class=\\"gh-stars\\">"+p.stars+"</span></div><div class=\\"gh-card-desc\\">"+desc+"</div></div>";\n'
     gh_js += '  }\n'
     gh_js += '  cardsDiv.innerHTML = h;\n'
     gh_js += '  updateBookmarkUI();\n'

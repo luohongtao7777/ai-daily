@@ -386,10 +386,14 @@ function scrollToDay(date) {
   if (typeof switchGhData === 'function') switchGhData(date);
 }
 // 页面加载时仅显示第一个 day-section
-(function() {
+setTimeout(function() {
   var first = document.querySelector('.day-section');
-  if (first) first.classList.add('active');
-})();
+  if (first) {
+    first.classList.add('active');
+    var fd = first.id.replace('day-', '');
+    if (fd && typeof switchGhData === 'function') switchGhData(fd);
+  }
+}, 0);
 </script>
 
 </body>
