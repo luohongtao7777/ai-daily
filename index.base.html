@@ -382,6 +382,8 @@ function scrollToDay(date) {
   }
   var link = document.querySelector('.day-nav a[data-date="' + date + '"]');
   if (link) link.classList.add('active');
+  // 同步切换对应日期的 GitHub 项目数据
+  if (typeof switchGhData === 'function') switchGhData(date);
 }
 // 页面加载时仅显示第一个 day-section
 (function() {

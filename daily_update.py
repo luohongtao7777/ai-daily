@@ -26,6 +26,16 @@ if fetch_result.stderr.strip():
 print("\n--- 🔥 GitHub 项目 ---")
 subprocess.run(["python", str(BASE / "fetch_github_projects.py")])
 
+# Step 1.1: 保存当天 GitHub 快照
+today_str = datetime.now().strftime("%Y-%m-%d")
+gh_snapshot = BASE / f"gh_{today_str}.json"
+if not gh_snapshot.exists():
+    src = BASE / "github_projects.json"
+    if src.exists():
+        import shutil
+        shutil.copy2(src, gh_snapshot)
+        print(f"  ✅ 已保存 {gh_snapshot.name}")
+
 # Step 1.5: 翻译检查 — 输出 JSON 标记给 agent 消费
 print("\n--- 🌐 翻译检查 ---")
 result = subprocess.run(
