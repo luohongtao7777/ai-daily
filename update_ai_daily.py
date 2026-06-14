@@ -214,8 +214,14 @@ GH_CSS = """
 def inject_github(html, gh_data):
     items = (gh_data.get("items") or [])[:10]
     if not items: return html
-    # 已有 ghData （新版页面）时跳过全部注入，由 ghData 机制管理
+    # 已有 ghData 时，只更新卡片内容，不重注入整个结构
     if '// GH_DATA_START' in html:
+        cards_start = html.find('id="github-cards"')
+        if cards_start >= 0:
+            tag_end = html.find('>', cards_start) + 1
+            div_end = html.find('</div>', tag_end)
+            if div_end >= 0:
+                html = html[:tag_end] + '\n' + gh_cards(items) + '\n' + html[div_end:]
         return html
 
     # 首次注入：页面还没有 tab-github
